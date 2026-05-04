@@ -553,8 +553,17 @@ export default function UserDashboard() {
                                 const w = await wRes.json();
                                 const pRes = await fetch("http://127.0.0.1:5000/predict", {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ Nitrogen: cd.N, Phosphorus: cd.P, Potassium: cd.K, Ph: cd.ph, temperature: w.temperature, humidity: w.humidity, rainfall: w.rainfall })
+                                  headers: {
+                                    "Content-Type": "application/json"
+                                  },
+                                  body: JSON.stringify({
+                                    Nitrogen: clickedData.N,
+                                    Phosphorus: clickedData.P,
+                                    Potassium: clickedData.K,
+                                    Ph: clickedData.ph,
+                                    latitude: clickedData.lat,     // ✅ ADD THIS
+                                    longitude: clickedData.lng 
+                                  })
                                 });
                                 const pData = await pRes.json();
                                 setSoilPrediction(pData.recommendations || []);

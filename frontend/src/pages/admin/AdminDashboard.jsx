@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, Users, Settings,
-  FileText, CheckCircle2, Loader2
+  FileText, Loader2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -92,6 +92,8 @@ td.dim { color:var(--muted); font-family:'DM Mono',monospace; font-size:13px; }
 td.bold { font-weight:600; color:var(--text); }
 .link-btn { color:var(--forest-mid); font-weight:600; font-size:13px; text-decoration:none; }
 .link-btn:hover { text-decoration:underline; }
+.delete-btn { background:var(--red-bg); color:var(--red); border:1px solid #fecaca; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Sora',sans-serif; transition:all .15s; }
+.delete-btn:hover { background:var(--red); color:#fff; }
 .settings-grid { display:grid; grid-template-columns:1.1fr 1fr; gap:24px; }
 .form-field { margin-bottom:14px; }
 .form-field label { display:block; font-size:12px; font-weight:700; color:var(--text); margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px; }
@@ -102,14 +104,31 @@ td.bold { font-weight:600; color:var(--text); }
 .toggle-row .lbl p { font-size:12px; color:var(--muted); margin-top:2px; }
 .btn-green { background:var(--forest-mid); color:#fff; border:none; padding:11px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-size:14px; font-family:'Sora',sans-serif; display:inline-flex; align-items:center; gap:7px; }
 .danger-zone { border:1px solid #fecaca !important; background:var(--red-bg) !important; }
+.delete-btn {
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid #fecaca;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Sora', sans-serif;
+  transition: all .15s;
+}
+.delete-btn:hover {
+  background: var(--red);
+  color: #fff;
+}
 `;
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("dashboard");
-  const [profile, setProfile] = useState({ name: "Admin User", email: "tayalveer20@gmail.com", phone: "" });
+  const [profile, setProfile] = useState({ name: "", email: "", phone: "" });
   const [notifs, setNotifs] = useState({ email: true, push: false, weekly: true });
   const [researchers, setResearchers] = useState(null);
   const [verified, setVerified] = useState(null);
+  const [user, setUser] = useState({ name: "", email: "", role: "" });
   const fetched = useRef(false);
   const navigate = useNavigate();
 const [isAuthChecked, setIsAuthChecked] = useState(false);
@@ -117,7 +136,56 @@ const handleLogout = () => {
   localStorage.removeItem("token");
   navigate("/login");
 };
+const deleteResearcher = (id) => {
+    if (!window.confirm("Do you really want to Delete this Dataset Link?")) return;
 
+    const token = localStorage.getItem("token");
+
+    fetch(`http://localhost:8000/api/users/researchers/${id}/`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Token ${token}`,
+        "Content-Type": "application/json",
+      }
+    })
+      .then(r => {
+        if (r.ok || r.status === 204) {
+          setResearchers(prev => prev.filter(x => x.id !== id));
+        } else {
+          alert("Not Deleted! Status: " + r.status);
+        }
+      })
+      .catch(() => alert("Server error"));
+  };
+
+useEffect(() => {
+  const token = localStorage.getItem("token");
+
+  fetch("http://127.0.0.1:8000/api/users/profile/", {
+    headers: {
+      Authorization: `Token ${token}`
+    }
+  })
+    .then(res => {
+      if (!res.ok) throw new Error("Failed to fetch profile");
+      return res.json();
+    })
+    .then(data => {
+      setUser({
+        name: data.full_name,
+        email: data.email,
+        role: data.role
+      });
+
+      setSettings({
+        name: data.full_name,
+        email: data.email
+      });
+    })
+    .catch(err => {
+      console.error("Profile fetch error:", err);
+    });
+}, []);
 
 useEffect(() => {
   const token = localStorage.getItem("token");
@@ -132,18 +200,17 @@ useEffect(() => {
   if (fetched.current) return;
   fetched.current = true;
 
-  fetch("http://localhost:8000/api/users/")
-    .then(r => r.json())
-    .then(data => setVerified(data))
-    .catch(() => setVerified([]));
+    fetch("http://localhost:8000/api/users/")
+      .then(r => r.json())
+      .then(data => setVerified(data))
+      .catch(() => setVerified([]));
 
-  fetch("http://localhost:8000/api/users/researchers/")
-    .then(r => r.json())
-    .then(data => setResearchers(data))
-    .catch(() => setResearchers([]));
+    fetch("http://localhost:8000/api/users/researchers/")
+      .then(r => r.json())
+      .then(data => setResearchers(data))
+      .catch(() => setResearchers([]));
+  }, []);
 
-}, []);
-  if (!isAuthChecked) return null;
   return (
     <>
       <style>{css}</style>
@@ -162,9 +229,6 @@ useEffect(() => {
             <div className={`nav-item ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>
               <Settings size={18} /> <span>Settings</span>
             </div>
-           <button className="logout-btn" onClick={handleLogout}>
-  Logout
-</button>
             <div className="user-chip">
               <div className="avatar">AS</div>
               <div className="info"><h4>Admin User</h4><p>tayalveer20@gmail.com</p></div>
@@ -206,15 +270,19 @@ useEffect(() => {
                 {researchers === null
                   ? <div className="loading"><Loader2 size={18} className="spin" /> Loading…</div>
                   : researchers.length === 0
-                    ? <p style={{ color:"var(--muted)", fontSize:14 }}>No datasets yet.</p>
+                    ? <p style={{ color: "var(--muted)", fontSize: 14 }}>No datasets yet.</p>
                     : <table>
                         <thead><tr><th>ID</th><th>Name</th><th>Link</th><th>User ID</th></tr></thead>
                         <tbody>
                           {researchers.map(r => (
-                            <tr key={r.id}>
+                           <tr key={r.id}>
                               <td className="dim">#{r.id}</td>
                               <td className="bold">{r.name}</td>
-                              <td><a href={r.url} target="_blank" rel="noopener noreferrer" className="link-btn">View link</a></td>
+                              <td>
+                                <a href={r.url} target="_blank" rel="noopener noreferrer" className="link-btn">
+                                  View link
+                                </a>
+                              </td>
                               <td className="dim">{r.user_id}</td>
                             </tr>
                           ))}
@@ -257,34 +325,38 @@ useEffect(() => {
               <div className="settings-grid">
                 <div>
                   <div className="card">
-                    <h3 style={{fontSize:15,fontWeight:700,marginBottom:16}}>Profile</h3>
-                    {[["Full Name","text","name"],["Email","email","email"],["Phone","text","phone"]].map(([label,type,key]) => (
+                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Profile</h3>
+                    {[["Full Name", "text", "name"], ["Email", "email", "email"], ["Phone", "text", "phone"]].map(([label, type, key]) => (
                       <div className="form-field" key={key}>
                         <label>{label}</label>
-                        <input type={type} value={profile[key]} onChange={e => setProfile({...profile,[key]:e.target.value})} />
+                        <input type={type} value={profile[key]} onChange={e => setProfile({ ...profile, [key]: e.target.value })} />
                       </div>
                     ))}
                   </div>
                   <div className="card">
-                    <h3 style={{fontSize:15,fontWeight:700,marginBottom:16}}>Security</h3>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Security</h3>
                     <div className="form-field"><label>Current Password</label><input type="password" placeholder="••••••••" /></div>
                     <div className="form-field"><label>New Password</label><input type="password" placeholder="New password" /></div>
                   </div>
                 </div>
                 <div>
                   <div className="card">
-                    <h3 style={{fontSize:15,fontWeight:700,marginBottom:16}}>Notifications</h3>
-                    {[{key:"email",label:"Email Alerts",sub:"Get updates via email"},{key:"push",label:"Push Notifications",sub:"Browser popups"},{key:"weekly",label:"Weekly Reports",sub:"Summary every Monday"}].map(({key,label,sub}) => (
+                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Notifications</h3>
+                    {[
+                      { key: "email", label: "Email Alerts", sub: "Get updates via email" },
+                      { key: "push", label: "Push Notifications", sub: "Browser popups" },
+                      { key: "weekly", label: "Weekly Reports", sub: "Summary every Monday" }
+                    ].map(({ key, label, sub }) => (
                       <div className="toggle-row" key={key}>
                         <div className="lbl"><h4>{label}</h4><p>{sub}</p></div>
-                        <input type="checkbox" checked={notifs[key]} onChange={() => setNotifs({...notifs,[key]:!notifs[key]})} style={{width:18,height:18,cursor:"pointer",accentColor:"var(--forest-mid)"}} />
+                        <input type="checkbox" checked={notifs[key]} onChange={() => setNotifs({ ...notifs, [key]: !notifs[key] })} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "var(--forest-mid)" }} />
                       </div>
                     ))}
                   </div>
                   <div className="card danger-zone">
-                    <h3 style={{color:"var(--red)",fontSize:15,fontWeight:700,marginBottom:8}}>Danger Zone</h3>
-                    <p style={{fontSize:12,color:"#7f1d1d",marginBottom:14}}>Actions here cannot be undone.</p>
-                    <button style={{width:"100%",padding:"11px",background:"var(--red)",color:"#fff",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer"}}>Delete My Account</button>
+                    <h3 style={{ color: "var(--red)", fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Danger Zone</h3>
+                    <p style={{ fontSize: 12, color: "#7f1d1d", marginBottom: 14 }}>Actions here cannot be undone.</p>
+                    <button style={{ width: "100%", padding: "11px", background: "var(--red)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}>Delete My Account</button>
                   </div>
                 </div>
               </div>

@@ -340,7 +340,23 @@ def predict_api():
                 "crop": crop_labels[i],
                 "confidence": float(round(probs[i]*100, 2))
             })
+            # 🌡️ dynamic crop filtering based on temperature
+            if temp > 30:
+                allowed_crops = ["maize", "groundnut", "pearl millet", "rice"]
+            else:
+                allowed_crops = ["mustard", "pea", "potato"]
 
+            filtered_result = [r for r in result if r["crop"] in allowed_crops]
+
+            if filtered_result:
+                result = filtered_result[:3]
+            else:
+                result = []
+                for i, crop in enumerate(allowed_crops[:3]):
+                    result.append({
+                        "crop": crop,
+                        "confidence": float(round(probs[idx[i]] * 100, 2))
+                    })
         return jsonify({
             "recommendations": result,
             "temperature": float(temp),
@@ -387,15 +403,23 @@ def soil_health_api():
             "OC":[OC], "EC":[EC], "pH":[pH]
         })
 
-        soil_sample = nutrient_sample[[
-            "N","P","K","EC","OC","pH","S","Fe","Zn","Mn","Cu"
-        ]]
+        soil_sample = pd.DataFrame({
+             "N": [N], "P": [P], "K": [K], 
+             "EC": [EC], "OC": [OC], "pH": [pH],
+             "S": [S], "Fe": [Fe], "Zn": [Zn], 
+            "Mn": [Mn], "Cu": [Cu]
+        })
 
-        # soil prediction
-        sample_scaled = scaler.transform(soil_sample)
-        sample_scaled = pd.DataFrame(sample_scaled, columns=soil_sample.columns)
-
-        predicted_shi = float(soil_model.predict(sample_scaled)[0])
+# soil prediction
+  
+        predicted_shi = float(soil_model.predict(soil_sample)[0])
+        print("🔥 SHI VALUE:", predicted_shi)      # ← ADD
+        
+        category = soil_category(predicted_shi)
+        print("🔥 CATEGORY:", category)             # ← ADD
+        
+        suggestions = soil_suggestions(category)
+        print("🔥 SUGGESTIONS:", suggestions)
 
         category = soil_category(predicted_shi)
         suggestions = soil_suggestions(category)
