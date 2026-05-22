@@ -9,6 +9,10 @@ from flask_cors import CORS
 import psycopg
 import urllib3
 import time
+import os
+
+
+from dhurandar.backend.backend.settings import BASE_DIR
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 city_cache = {}
@@ -20,7 +24,8 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 try:
-    conn = psycopg.connect("postgresql://neondb_owner:npg_o9aPVFSl6veQ@ep-dawn-wave-ai5lexdl-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=disable")
+
+    conn = psycopg.connect(os.getenv("DATABASE_URL"))
     conn.autocommitt = True
     print("✅ Connected")
 except Exception as e:
@@ -29,12 +34,11 @@ except Exception as e:
 # ---------------------------------
 # LOAD MODELS
 # ---------------------------------
-season_model = joblib.load("models/season_model.pkl")
-
-soil_model = joblib.load("models/soil_health_model.pkl")
-nutrient_model = joblib.load("models/nutrient_deficiency_model.pkl")
-scaler = joblib.load("models/soil_scaler.pkl")
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+season_model = joblib.load(os.path.join(BASE_DIR, "models", "season_model.pkl"))
+soil_model = joblib.load(os.path.join(BASE_DIR, "models", "soil_health_model.pkl"))
+nutrient_model = joblib.load(os.path.join(BASE_DIR, "models", "nutrient_deficiency_model.pkl"))
+scaler = joblib.load(os.path.join(BASE_DIR, "models", "soil_scaler.pkl"))
 # crop labels
 crop_labels = ['groundnut', 'maize', 'mustard', 'pea', 'pearl millet', 'potato', 'rice']
 
@@ -507,4 +511,5 @@ def geocode():
 # RUN
 # ---------------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
