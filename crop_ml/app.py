@@ -19,11 +19,11 @@ city_cache = {}
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=["https://dhurandar-aeoa.vercel.app/"])
-try:
+CORS(app, origins=["https://dhurandar-aeoa.vercel.app"])
 
+try:
     conn = psycopg.connect(os.getenv("DATABASE_URL"))
-    conn.autocommitt = True
+    conn.autocommit = True
     print("✅ Connected")
 except Exception as e:
     print("❌ Error:", e)
@@ -36,7 +36,7 @@ season_model = joblib.load(os.path.join(BASE_DIR, "models", "season_model.pkl"))
 soil_model = joblib.load(os.path.join(BASE_DIR, "models", "soil_health_model.pkl"))
 nutrient_model = joblib.load(os.path.join(BASE_DIR, "models", "nutrient_deficiency_model.pkl"))
 scaler = joblib.load(os.path.join(BASE_DIR, "models", "soil_scaler.pkl"))
-# crop labels
+
 crop_labels = ['groundnut', 'maize', 'mustard', 'pea', 'pearl millet', 'potato', 'rice']
 
 # ---------------------------------
@@ -44,196 +44,122 @@ crop_labels = ['groundnut', 'maize', 'mustard', 'pea', 'pearl millet', 'potato',
 # ---------------------------------
 def get_weather(lat, lon):
     api_key = os.getenv("WEATHER_API_KEY")
-
     if not api_key:
         return None, None
-
     url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric"
-
     try:
-        res = requests.get(url,timeout=5)
+        res = requests.get(url, timeout=5)
         data = res.json()
-
         if res.status_code != 200:
             return None, None
-
-        temp = data["main"]["temp"]
-        humidity = data["main"]["humidity"]
-
-        return temp, humidity
-
+        return data["main"]["temp"], data["main"]["humidity"]
     except:
         return None, None
 
+
 def get_weather_by_city(city):
     api_key = os.getenv("WEATHER_API_KEY")
-
     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-
     try:
-        res = requests.get(url,timeout=5)
+        res = requests.get(url, timeout=5)
         data = res.json()
-
         if res.status_code != 200:
             print("WEATHER API ERROR:", data)
             return None, None
-
-        temp = data["main"]["temp"]
-        humidity = data["main"]["humidity"]
-
-        return temp, humidity
-
+        return data["main"]["temp"], data["main"]["humidity"]
     except Exception as e:
         print("WEATHER ERROR:", e)
         return None, None
 
+
 def get_rainfall_forecast(lat, lon):
     api_key = os.getenv("WEATHER_API_KEY")
-
     url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}&units=metric"
-
     try:
-        res = requests.get(url,timeout=5)
+        res = requests.get(url, timeout=5)
         data = res.json()
-
         if res.status_code != 200:
             return None
-
         total_rain = 0
-
         for item in data["list"]:
-            rain = item.get("rain", {}).get("3h", 0)
-            total_rain += rain
-
+            total_rain += item.get("rain", {}).get("3h", 0)
         return total_rain
-
     except:
         return None
-    
+
+
 def get_rainfall_forecast_by_city(city):
     api_key = os.getenv("WEATHER_API_KEY")
-
     url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric"
-
     try:
-        res = requests.get(url,timeout=5)
+        res = requests.get(url, timeout=5)
         data = res.json()
-
         if res.status_code != 200:
             print("RAIN API ERROR:", data)
             return None
-
         total_rain = 0
-
         for item in data.get("list", []):
-            rain = item.get("rain", {}).get("3h", 0)
-            total_rain += rain
-
-        return total_rain   # next 5 days rainfall
-
+            total_rain += item.get("rain", {}).get("3h", 0)
+        return total_rain
     except Exception as e:
         print("RAIN ERROR:", e)
         return None
-    
-#converting lat long into city
+
+
 def get_city_from_coords(lat, lon):
     url = "https://nominatim.openstreetmap.org/reverse"
-
-    params = {
-        "format": "json",
-        "lat": lat,
-        "lon": lon
-    }
-
-    headers = {
-        "User-Agent": "AgriSmartApp (mansi@gmail.com)"
-    }
-
-    # 🔁 retry system (important)
+    params = {"format": "json", "lat": lat, "lon": lon}
+    headers = {"User-Agent": "AgriSmartApp (mansi@gmail.com)"}
     for i in range(3):
         try:
-            res = requests.get(
-                url,
-                params=params,
-                headers=headers,
-                timeout=5,
-                verify=False   # 🔥 SSL bypass
-            )
-
+            res = requests.get(url, params=params, headers=headers, timeout=5, verify=False)
             data = res.json()
-            print("DATA:", data)
-
             address = data.get("address", {})
-
-            # 🔥 best possible name
             city = (
-                address.get("city") or
-                address.get("town") or
-                address.get("village") or
-                address.get("suburb") or
-                address.get("county") or
-                address.get("state_district") or
+                address.get("city") or address.get("town") or
+                address.get("village") or address.get("suburb") or
+                address.get("county") or address.get("state_district") or
                 address.get("state")
             )
-
-            # 🔥 fallback using display_name
             if not city:
                 display = data.get("display_name", "")
                 if display:
                     city = display.split(",")[0]
-
             if city:
                 return city
-
         except Exception as e:
             print(f"Retry {i+1} failed:", e)
             time.sleep(1)
-
-    # 🔥 final fallback
     return "Nearby Area"
 
+
 def get_city_cached(lat, lon):
-    key = f"{round(lat,4)},{round(lon,4)}"   # 🔥 rounding important
-
+    key = f"{round(lat,4)},{round(lon,4)}"
     if key in city_cache:
-        print("CACHE HIT ✅")
         return city_cache[key]
-
-    print("API CALL 🌐")
     city = get_city_from_coords(lat, lon)
-
     city_cache[key] = city
     return city
+
+
 # ---------------------------------
 # FEATURE BUILDER
 # ---------------------------------
 def build_features(N, P, K, ph, rainfall, temp, humidity):
-
     npk_total = N + P + K
     soil_fertility = 0.4*N + 0.3*P + 0.3*K
-
     n_p_ratio = N / (P + 1)
     n_k_ratio = N / (K + 1)
     p_k_ratio = P / (K + 1)
-
     water_index = rainfall * humidity
     gdd_approx = temp - 10
-
     season_rabi = 1
-
-    return np.array([[  
-        N, P, K,
-        temp, humidity,
-        ph, rainfall,
-        npk_total,
-        soil_fertility,
-        n_p_ratio,
-        n_k_ratio,
-        p_k_ratio,
-        water_index,
-        gdd_approx,
-        season_rabi
+    return np.array([[
+        N, P, K, temp, humidity, ph, rainfall,
+        npk_total, soil_fertility, n_p_ratio,
+        n_k_ratio, p_k_ratio, water_index, gdd_approx, season_rabi
     ]])
+
 
 # ---------------------------------
 # SOIL HELPERS
@@ -267,15 +193,15 @@ def soil_suggestions(category):
             "Continue sustainable farming practices"
         ]
 
+
 # ---------------------------------
-# 🔥 CROP API
+# CROP API
 # ---------------------------------
 @app.route('/predict', methods=['POST'])
 def predict_api():
-   try:
+    try:
         data = request.json
 
-        # 🔥 CHECK: lat/lon ya manual input
         lat = data.get('latitude')
         lon = data.get('longitude')
 
@@ -286,7 +212,7 @@ def predict_api():
             query = """
             SELECT nitrogen, phosphorus, potassium, ph
             FROM Datasets
-            WHERE latitude ~ '^[0-9.]+' 
+            WHERE latitude ~ '^[0-9.]+'
                 AND longitude ~ '^[0-9.]+'
                 ORDER BY
                 ABS(latitude::double precision - %s) +
@@ -297,41 +223,30 @@ def predict_api():
             with conn.cursor() as cursor:
                 cursor.execute(query, (lat, lon))
                 result = cursor.fetchone()
+
             if not result:
                 return jsonify({"error": "No data found for this location"})
 
             N, P, K, ph = result
-            N = float(N)
-            P = float(P)
-            K = float(K)
-            ph = float(ph)
-            city = get_city_cached(lat, lon)
-
-            if not city:
-                city = "Location Found"
+            N, P, K, ph = float(N), float(P), float(K), float(ph)
+            city = get_city_cached(lat, lon) or "Location Found"
             temp, humidity = get_weather(lat, lon)
             rainfall = get_rainfall_forecast(lat, lon)
         else:
-            # 🔥 manual input
-            N = float(data.get('Nitrogen')or 0)
-            P = float(data.get('Phosphorus')or 0)
-            K = float(data.get('Potassium')or 0)
-            ph = float(data.get('Ph')or 7.0)
-
-            city = data.get('city')
-            if city:
-                city = city.strip().title() 
+            N = float(data.get('Nitrogen') or 0)
+            P = float(data.get('Phosphorus') or 0)
+            K = float(data.get('Potassium') or 0)
+            ph = float(data.get('Ph') or 7.0)
+            city = data.get('city', '').strip().title()
             temp, humidity = get_weather_by_city(city)
-            rainfall = get_rainfall_forecast_by_city(city) 
+            rainfall = get_rainfall_forecast_by_city(city)
 
         if temp is None:
             return jsonify({"error": "Weather API error"})
         if rainfall is None:
             return jsonify({"error": "Rainfall data not available"})
 
-        # features
         features = build_features(N, P, K, ph, rainfall, temp, humidity)
-
         probs = season_model.predict_proba(features)[0]
         idx = np.argsort(probs)[-3:][::-1]
 
@@ -339,25 +254,27 @@ def predict_api():
         for i in idx:
             result.append({
                 "crop": crop_labels[i],
-                "confidence": float(round(probs[i]*100, 2))
+                "confidence": float(round(probs[i] * 100, 2))
             })
-            # 🌡️ dynamic crop filtering based on temperature
-            if temp > 30:
-                allowed_crops = ["maize", "groundnut", "pearl millet", "rice"]
-            else:
-                allowed_crops = ["mustard", "pea", "potato"]
 
-            filtered_result = [r for r in result if r["crop"] in allowed_crops]
+        # dynamic crop filtering based on temperature
+        if temp > 30:
+            allowed_crops = ["maize", "groundnut", "pearl millet", "rice"]
+        else:
+            allowed_crops = ["mustard", "pea", "potato"]
 
-            if filtered_result:
-                result = filtered_result[:3]
-            else:
-                result = []
-                for i, crop in enumerate(allowed_crops[:3]):
-                    result.append({
-                        "crop": crop,
-                        "confidence": float(round(probs[idx[i]] * 100, 2))
-                    })
+        filtered_result = [r for r in result if r["crop"] in allowed_crops]
+
+        if filtered_result:
+            result = filtered_result[:3]
+        else:
+            result = []
+            for j, crop in enumerate(allowed_crops[:3]):
+                result.append({
+                    "crop": crop,
+                    "confidence": float(round(probs[idx[j]] * 100, 2))
+                })
+
         return jsonify({
             "recommendations": result,
             "temperature": float(temp),
@@ -371,14 +288,15 @@ def predict_api():
                 "ph": float(ph)
             }
         })
-   except Exception as e:
-        conn.rollback()   # 🔥 IMPORTANT FIX
+
+    except Exception as e:
+        conn.rollback()
         print("ERROR:", e)
         return jsonify({"error": str(e)})
 
 
 # ---------------------------------
-# 🔥 SOIL HEALTH API
+# SOIL HEALTH API
 # ---------------------------------
 @app.route('/soil-health', methods=['POST'])
 def soil_health_api():
@@ -398,39 +316,27 @@ def soil_health_api():
         Cu = float(data["Cu"])
 
         nutrient_sample = pd.DataFrame({
-            "N":[N], "P":[P], "K":[K],
-            "S":[S], "Fe":[Fe], "Zn":[Zn],
-            "Mn":[Mn], "Cu":[Cu],
-            "OC":[OC], "EC":[EC], "pH":[pH]
+            "N": [N], "P": [P], "K": [K],
+            "S": [S], "Fe": [Fe], "Zn": [Zn],
+            "Mn": [Mn], "Cu": [Cu],
+            "OC": [OC], "EC": [EC], "pH": [pH]
         })
 
         soil_sample = pd.DataFrame({
-             "N": [N], "P": [P], "K": [K], 
-             "EC": [EC], "OC": [OC], "pH": [pH],
-             "S": [S], "Fe": [Fe], "Zn": [Zn], 
+            "N": [N], "P": [P], "K": [K],
+            "EC": [EC], "OC": [OC], "pH": [pH],
+            "S": [S], "Fe": [Fe], "Zn": [Zn],
             "Mn": [Mn], "Cu": [Cu]
         })
 
-# soil prediction
-  
         predicted_shi = float(soil_model.predict(soil_sample)[0])
-        print("🔥 SHI VALUE:", predicted_shi)      # ← ADD
-        
-        category = soil_category(predicted_shi)
-        print("🔥 CATEGORY:", category)             # ← ADD
-        
-        suggestions = soil_suggestions(category)
-        print("🔥 SUGGESTIONS:", suggestions)
-
         category = soil_category(predicted_shi)
         suggestions = soil_suggestions(category)
 
-        # nutrient deficiency
         pred = nutrient_model.predict(nutrient_sample)[0]
-
         nutrients = [
-            "Nitrogen","Phosphorus","Potassium",
-            "Sulphur","Iron","Zinc","Manganese","Copper"
+            "Nitrogen", "Phosphorus", "Potassium",
+            "Sulphur", "Iron", "Zinc", "Manganese", "Copper"
         ]
 
         deficiencies = []
@@ -448,28 +354,27 @@ def soil_health_api():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+
+# ---------------------------------
+# WEATHER API
+# ---------------------------------
 @app.route('/weather', methods=['GET'])
 def weather_only():
     try:
         lat = request.args.get('lat')
         lon = request.args.get('lon')
 
-        # ✅ validation
         if not lat or not lon:
             return jsonify({"error": "Latitude and Longitude required"})
 
-        lat = float(lat)
-        lon = float(lon)
-
-        # ✅ existing functions use karo
+        lat, lon = float(lat), float(lon)
         temp, humidity = get_weather(lat, lon)
         rainfall = get_rainfall_forecast(lat, lon)
         city = get_city_cached(lat, lon)
 
         if temp is None:
             return jsonify({"error": "Weather fetch failed"})
-        if rainfall is None:
-            rainfall = 0
+
         return jsonify({
             "temperature": float(temp),
             "humidity": float(humidity),
@@ -480,17 +385,19 @@ def weather_only():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+
+# ---------------------------------
+# GEOCODE API
+# ---------------------------------
 @app.route('/geocode', methods=['GET'])
 def geocode():
     try:
         place = request.args.get('place')
-
         if not place:
             return jsonify({"error": "Place is required"})
 
         url = f"https://nominatim.openstreetmap.org/search?q={place}&format=json"
-
-        res = requests.get(url, headers={"User-Agent": "agri-smart-app"},verify=False,timeout=5)
+        res = requests.get(url, headers={"User-Agent": "agri-smart-app"}, verify=False, timeout=5)
         data = res.json()
 
         if not data:
@@ -504,6 +411,16 @@ def geocode():
 
     except Exception as e:
         return jsonify({"error": str(e)})
+
+
+# ---------------------------------
+# HOME
+# ---------------------------------
+@app.route('/')
+def home():
+    return jsonify({"status": "AgriSmart API Running 🚀"})
+
+
 # ---------------------------------
 # RUN
 # ---------------------------------
