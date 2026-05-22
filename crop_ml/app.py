@@ -9,10 +9,7 @@ from flask_cors import CORS
 import psycopg
 import urllib3
 import time
-import os
 
-
-from dhurandar.backend.backend.settings import BASE_DIR
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 city_cache = {}
@@ -22,7 +19,7 @@ city_cache = {}
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://dhurandar-aeoa.vercel.app/"])
 try:
 
     conn = psycopg.connect(os.getenv("DATABASE_URL"))
