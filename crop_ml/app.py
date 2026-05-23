@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import pandas as pd
 import joblib
 from flask_cors import CORS
-import psycopg2  # FIX: was 'psycopg' (psycopg3), should be 'psycopg2'
+import psycopg # FIX: was 'psycopg' (psycopg3), should be 'psycopg2'
 import urllib3
 import time
 
@@ -23,7 +23,7 @@ CORS(app, origins=["https://dhurandar-aeoa.vercel.app"])
 
 conn = None  # FIX: initialize as None so we can check later
 try:
-    conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+    conn = psycopg.connect(os.getenv("DATABASE_URL"))
     conn.autocommit = True
     print("✅ Connected")
 except Exception as e:
@@ -205,16 +205,14 @@ def soil_suggestions(category):
 def get_cursor():
     global conn
     try:
-        # Test if connection is alive
         conn.cursor().execute("SELECT 1")
     except Exception:
         try:
-            conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+            conn = psycopg.connect(os.getenv("DATABASE_URL"))
             conn.autocommit = True
         except Exception as e:
             raise RuntimeError(f"DB reconnect failed: {e}")
     return conn.cursor()
-
 
 # ---------------------------------
 # CROP API
