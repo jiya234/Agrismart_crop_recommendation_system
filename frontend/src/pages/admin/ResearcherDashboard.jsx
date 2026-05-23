@@ -7,13 +7,12 @@ import 'leaflet/dist/leaflet.css';
 import { useMapEvents } from "react-leaflet";
 import L from 'leaflet';
 import {
-  Cloud, Map, Settings,
+  Cloud, Map, Settings, Menu,
   LayoutDashboard, CloudRain, Wheat, Navigation, X, LogOut,
   Database, FileText, Download
 } from "lucide-react";
 import "./ResearcherDashboard.css";
 
-// --- Leaflet Icon Fix ---
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -23,7 +22,6 @@ L.Icon.Default.mergeOptions({
 
 export default function ResearcherDashboard() {
 
-  // --- CORE STATE ---
   const [inputLat, setInputLat] = useState("27.80");
   const [inputLng, setInputLng] = useState("78.65");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -33,8 +31,8 @@ export default function ResearcherDashboard() {
   const [dashboardWeather, setDashboardWeather] = useState(null);
   const [activePage, setActivePage] = useState("dashboard");
   const [place, setPlace] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // --- SOIL MAP STATE ---
   const [selectedSoil, setSelectedSoil] = useState(null);
   const [showSoilModal, setShowSoilModal] = useState(false);
   const [soilPrediction, setSoilPrediction] = useState([]);
@@ -42,36 +40,28 @@ export default function ResearcherDashboard() {
   const [soilData, setSoilData] = useState([]);
   const [nutrient, setNutrient] = useState("N");
 
-  // --- FIELDS STATE ---
   const [fields, setFields] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [newField, setNewField] = useState({ name: "", crop: "", area: "", lat: "", lng: "" });
 
-  // --- RESEARCHER DATASET STATE ---
   const [researchData, setResearchData] = useState([]);
   const [newDatasetName, setNewDatasetName] = useState("");
   const [newDatasetUrl, setNewDatasetUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
-  // --- SETTINGS STATE ---
   const [settings, setSettings] = useState({ name: "", email: "" });
   const [isSaving, setIsSaving] = useState(false);
 
-  // ============================================================
-  // AUTH GUARD
-  // ============================================================
+  const navigate = (page) => {
+    setActivePage(page);
+    setSidebarOpen(false);
+  };
+
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      window.location.href = "/login";
-    }
+    if (!token) window.location.href = "/login";
   }, []);
 
-  // ============================================================
-  // DATA FETCHING
-  // ============================================================
-
-  // Fetch researcher datasets
   useEffect(() => {
     const token = localStorage.getItem("token");
     fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/researchers/`, {
@@ -82,7 +72,6 @@ export default function ResearcherDashboard() {
       .catch(err => console.error("Research fetch error:", err));
   }, []);
 
-  // Fetch soil data
   useEffect(() => {
     fetch("/soil_data.json")
       .then(res => res.json())
@@ -90,16 +79,12 @@ export default function ResearcherDashboard() {
       .catch(err => console.log("Soil Data Error:", err));
   }, []);
 
-  // Fetch user profile
   useEffect(() => {
     const token = localStorage.getItem("token");
     fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/profile/`, {
       headers: { Authorization: `Token ${token}` }
     })
-      .then(res => {
-        if (!res.ok) throw new Error("Failed to fetch profile");
-        return res.json();
-      })
+      .then(res => { if (!res.ok) throw new Error("Failed"); return res.json(); })
       .then(data => {
         setUser({ name: data.full_name, email: data.email, role: data.role });
         setSettings({ name: data.full_name, email: data.email });
@@ -107,30 +92,18 @@ export default function ResearcherDashboard() {
       .catch(err => console.error("Profile fetch error:", err));
   }, []);
 
-  // Fetch fields on mount
-  useEffect(() => {
-    fetchFields();
-  }, []);
+  useEffect(() => { fetchFields(); }, []);
 
-  // Live weather debounce
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!inputLat || !inputLng) return;
       fetch(`${process.env.REACT_APP_FLASK_URL}/weather?lat=${inputLat}&lon=${inputLng}`)
         .then(res => res.json())
-        .then(data => setDashboardWeather({
-          temp: data.temperature,
-          humidity: data.humidity,
-          rainfall: data.rainfall
-        }))
+        .then(data => setDashboardWeather({ temp: data.temperature, humidity: data.humidity, rainfall: data.rainfall }))
         .catch(err => console.error("Weather fetch error:", err));
     }, 800);
     return () => clearTimeout(timeout);
   }, [inputLat, inputLng]);
-
-  // ============================================================
-  // HANDLERS
-  // ============================================================
 
   const fetchFields = async () => {
     try {
@@ -141,13 +114,8 @@ export default function ResearcherDashboard() {
       if (!res.ok) throw new Error("Failed to fetch fields");
       const data = await res.json();
       const formatted = data.map(f => ({
-        id: f.id,
-        name: f.field_name,
-        crop: f.crop || "Fallow",
-        area: f.area || "0",
-        lat: parseFloat(f.lat),
-        lng: parseFloat(f.lng),
-        color: "green"
+        id: f.id, name: f.field_name, crop: f.crop || "Fallow",
+        area: f.area || "0", lat: parseFloat(f.lat), lng: parseFloat(f.lng), color: "green"
       }));
       setFields(formatted);
     } catch (err) {
@@ -158,27 +126,16 @@ export default function ResearcherDashboard() {
 
   const handleAddField = async () => {
     const token = localStorage.getItem("token");
-    if (!newField.name || !newField.lat || !newField.lng) {
-      return alert("Please fill all details");
-    }
+    if (!newField.name || !newField.lat || !newField.lng) return alert("Please fill all details");
     try {
       const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/add-field/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`
-        },
-        body: JSON.stringify({
-          field_name: newField.name,
-          crop: newField.crop,
-          area: newField.area,
-          lat: parseFloat(newField.lat),
-          lng: parseFloat(newField.lng)
-        })
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+        body: JSON.stringify({ field_name: newField.name, crop: newField.crop, area: newField.area, lat: parseFloat(newField.lat), lng: parseFloat(newField.lng) })
       });
       const data = await res.json();
       console.log("Saved:", data);
-      fetchFields(); // refresh from DB
+      fetchFields();
       setShowModal(false);
       setNewField({ name: "", crop: "", area: "", lat: "", lng: "" });
     } catch (err) {
@@ -190,28 +147,16 @@ export default function ResearcherDashboard() {
   const handleGenerate = async () => {
     try {
       setIsAnalyzing(true);
-      if (isNaN(inputLat) || isNaN(inputLng)) {
-        alert("Please enter valid numeric latitude and longitude");
-        return;
-      }
-      const payload = {
-        latitude: parseFloat(inputLat),
-        longitude: parseFloat(inputLng)
-      };
+      if (isNaN(inputLat) || isNaN(inputLng)) { alert("Please enter valid numeric latitude and longitude"); return; }
       const res = await fetch(`${process.env.REACT_APP_FLASK_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ latitude: parseFloat(inputLat), longitude: parseFloat(inputLng) })
       });
       const data = await res.json();
       if (data.error) { alert(data.error); return; }
       setRecommendations(data.recommendations);
-      setWeather({
-        temp: data.temperature,
-        humidity: data.humidity,
-        rainfall: data.rainfall,
-        city: data.city
-      });
+      setWeather({ temp: data.temperature, humidity: data.humidity, rainfall: data.rainfall, city: data.city });
     } catch (err) {
       console.error("Error:", err);
     } finally {
@@ -219,39 +164,33 @@ export default function ResearcherDashboard() {
     }
   };
 
- const handleShareDataset = async (e) => {
-  e.preventDefault();
-  if (!newDatasetName.trim() || !newDatasetUrl.trim()) {
-    return alert("Please fill in both dataset title and URL");
-  }
-  setIsUploading(true);
-  try {
-    const token = localStorage.getItem("token");
-    const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/researchers/add/`, { // ✅ correct URL
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${token}`
-      },
-      body: JSON.stringify({ name: newDatasetName, url: newDatasetUrl }) // ✅ no user_id needed
-    });
-
-    if (res.ok) {
-      const newItem = await res.json();
-      alert("Dataset shared successfully! ✅");
-      setNewDatasetName("");
-      setNewDatasetUrl("");
-      setResearchData(prev => [newItem, ...prev]); // ✅ add to top of list
-    } else {
-      const err = await res.json();
-      alert(err.error || "Error sharing dataset ❌");
+  const handleShareDataset = async (e) => {
+    e.preventDefault();
+    if (!newDatasetName.trim() || !newDatasetUrl.trim()) return alert("Please fill in both dataset title and URL");
+    setIsUploading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/researchers/add/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
+        body: JSON.stringify({ name: newDatasetName, url: newDatasetUrl })
+      });
+      if (res.ok) {
+        const newItem = await res.json();
+        alert("Dataset shared successfully! ✅");
+        setNewDatasetName("");
+        setNewDatasetUrl("");
+        setResearchData(prev => [newItem, ...prev]);
+      } else {
+        const err = await res.json();
+        alert(err.error || "Error sharing dataset ❌");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server error ❌");
     }
-  } catch (err) {
-    console.error(err);
-    alert("Server error ❌");
-  }
-  setIsUploading(false);
-};
+    setIsUploading(false);
+  };
 
   const handleSaveSettings = async () => {
     setIsSaving(true);
@@ -259,10 +198,7 @@ export default function ResearcherDashboard() {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/update_user/`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
         body: JSON.stringify({ full_name: settings.name, email: settings.email })
       });
       if (res.ok) {
@@ -286,18 +222,13 @@ export default function ResearcherDashboard() {
       if (data.error) { alert(data.error); return; }
       setInputLat(data.lat);
       setInputLng(data.lon);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) { alert("Geolocation not supported"); return; }
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setInputLat(position.coords.latitude.toFixed(4));
-        setInputLng(position.coords.longitude.toFixed(4));
-      },
+      (position) => { setInputLat(position.coords.latitude.toFixed(4)); setInputLng(position.coords.longitude.toFixed(4)); },
       () => alert("Location access denied ❌")
     );
   };
@@ -306,25 +237,15 @@ export default function ResearcherDashboard() {
     if (!window.confirm("Are you sure you want to logout?")) return;
     try {
       const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/logout/`, {
-        method: "POST",
-        credentials: "include"
+        method: "POST", credentials: "include"
       });
       if (res.ok) {
         localStorage.removeItem("token");
         sessionStorage.clear();
         window.location.href = "/login";
-      } else {
-        alert("Logout failed ❌");
-      }
-    } catch (err) {
-      console.error("Logout error:", err);
-      alert("Server error ❌");
-    }
+      } else { alert("Logout failed ❌"); }
+    } catch (err) { console.error("Logout error:", err); alert("Server error ❌"); }
   };
-
-  // ============================================================
-  // HELPERS
-  // ============================================================
 
   const getInitials = (name) => {
     if (!name) return "U";
@@ -332,101 +253,59 @@ export default function ResearcherDashboard() {
   };
 
   const getColor = (value, type) => {
-    if (type === "N") {
-      if (value < 150) return "#ef4444";
-      if (value < 250) return "#facc15";
-      return "#22c55e";
-    }
-    if (type === "P") {
-      if (value < 10) return "#ef4444";
-      if (value < 25) return "#facc15";
-      return "#22c55e";
-    }
-    if (type === "K") {
-      if (value < 100) return "#ef4444";
-      if (value < 200) return "#facc15";
-      return "#22c55e";
-    }
-    if (type === "pH") {
-      if (value < 6) return "#60a5fa";
-      if (value < 7.5) return "#22c55e";
-      return "#f97316";
-    }
+    if (type === "N") { if (value < 150) return "#ef4444"; if (value < 250) return "#facc15"; return "#22c55e"; }
+    if (type === "P") { if (value < 10) return "#ef4444"; if (value < 25) return "#facc15"; return "#22c55e"; }
+    if (type === "K") { if (value < 100) return "#ef4444"; if (value < 200) return "#facc15"; return "#22c55e"; }
+    if (type === "pH") { if (value < 6) return "#60a5fa"; if (value < 7.5) return "#22c55e"; return "#f97316"; }
     return "#cccccc";
   };
 
   function MapClickHandler() {
     useMapEvents({
-      click(e) {
-        setInputLat(e.latlng.lat.toFixed(4));
-        setInputLng(e.latlng.lng.toFixed(4));
-      }
+      click(e) { setInputLat(e.latlng.lat.toFixed(4)); setInputLng(e.latlng.lng.toFixed(4)); }
     });
     return null;
   }
 
-  // ============================================================
-  // RENDER
-  // ============================================================
   return (
     <div className="app-container">
+      <button className="hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">
+        <Menu size={20} />
+      </button>
 
-      {/* ── Hamburger (mobile only) ── */}
-           <button className="hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">
-             <Menu size={20} />
-           </button>
-     
-           {/* ── Mobile backdrop ── */}
-           <div
-             className={`sidebar-backdrop ${sidebarOpen ? "visible" : ""}`}
-             onClick={() => setSidebarOpen(false)}
-           />
-     
-           {/* ── SIDEBAR ── */}
-           <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
-             <div className="logo-section">
-               <div className="logo-box"><CloudRain size={20} color="white" /></div>
-               <span className="logo-text">AgriSmart</span>
-             </div>
-     
-             <div className="profile-section">
-               <div className="profile-avatar">{getInitials(user.name)}</div>
-               <div className="profile-details">{user.name || "User"}</div>
-               <div className="status-badge">● Active field</div>
-             </div>
-     
-             <nav className="nav-menu">
-               {[
-                 { id: "dashboard",      label: "Dashboard",      icon: <LayoutDashboard size={18} /> },
-                 { id: "weather",        label: "Weather",        icon: <Cloud size={18} /> },
-                 { id: "fieldMap",       label: "Field Map",      icon: <Map size={18} /> },
-                 { id: "cropSuggestions",label: "Crop Suggestions",icon: <Wheat size={18} /> },
-                 { id: "soilHealth",     label: "Soil Health",    icon: <Wheat size={18} /> },
-                 { id: "researcherData", label: "Researcher Data",icon: <Database size={18} /> },
-                 { id: "settings",       label: "Settings",       icon: <Settings size={18} /> },
-               ].map(({ id, label, icon }) => (
-                 <div
-                   key={id}
-                   className={`nav-item ${activePage === id ? "active" : ""}`}
-                   onClick={() => navigate(id)}
-                   title={label}
-                 >
-                   {icon}
-                   <span>{label}</span>
-                 </div>
-               ))}
-             </nav>
-     
-             <div className="logout-section" onClick={handleLogout} title="Logout">
-               <LogOut size={18} />
-               <span>Logout</span>
-             </div>
-           </aside>
-     
-      {/* ===== MAIN CONTENT ===== */}
+      <div className={`sidebar-backdrop ${sidebarOpen ? "visible" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+        <div className="logo-section">
+          <div className="logo-box"><CloudRain size={20} color="white" /></div>
+          <span className="logo-text">AgriSmart</span>
+        </div>
+        <div className="profile-section">
+          <div className="profile-avatar">{getInitials(user.name)}</div>
+          <div className="profile-details">{user.name || "User"}</div>
+          <div className="status-badge">● Active field</div>
+        </div>
+        <nav className="nav-menu">
+          {[
+            { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
+            { id: "weather", label: "Weather", icon: <Cloud size={18} /> },
+            { id: "fieldMap", label: "Field Map", icon: <Map size={18} /> },
+            { id: "cropSuggestions", label: "Crop Suggestions", icon: <Wheat size={18} /> },
+            { id: "soilHealth", label: "Soil Health", icon: <Wheat size={18} /> },
+            { id: "researcherData", label: "Researcher Data", icon: <Database size={18} /> },
+            { id: "settings", label: "Settings", icon: <Settings size={18} /> },
+          ].map(({ id, label, icon }) => (
+            <div key={id} className={`nav-item ${activePage === id ? "active" : ""}`} onClick={() => navigate(id)} title={label}>
+              {icon}<span>{label}</span>
+            </div>
+          ))}
+        </nav>
+        <div className="logout-section" onClick={handleLogout} title="Logout">
+          <LogOut size={18} /><span>Logout</span>
+        </div>
+      </aside>
+
       <main className="main-content">
-
-        {/* ─── DASHBOARD ─── */}
         {activePage === "dashboard" && (
           <div className="content-fade-in" key="dashboard">
             <header className="page-header">
@@ -452,7 +331,6 @@ export default function ResearcherDashboard() {
                   </div>
                 </div>
               </div>
-
               <div className="stat-card" style={{ position: "relative", overflow: "hidden", padding: "30px" }}>
                 <p style={{ fontSize: "12px", color: "#9CA3AF", fontWeight: "600" }}>Enter Location</p>
                 <input type="text" placeholder="Enter city / village" value={place} onChange={(e) => setPlace(e.target.value)}
@@ -463,7 +341,6 @@ export default function ResearcherDashboard() {
                 </div>
               </div>
             </div>
-
             <div className="lower-grid">
               <div className="map-panel">
                 <div className="panel-header" onClick={() => setActivePage("fieldMap")} style={{ cursor: "pointer" }}>
@@ -491,7 +368,6 @@ export default function ResearcherDashboard() {
                   </MapContainer>
                 </div>
               </div>
-
               <div className="recommendation-panel">
                 <div className="panel-header">
                   <h3>🌾 Crop Recommendation</h3>
@@ -535,47 +411,36 @@ export default function ResearcherDashboard() {
           </div>
         )}
 
-        {/* ─── RESEARCHER DATA ─── */}
         {activePage === "researcherData" && (
           <div className="content-fade-in" key="researcherData">
             <header className="page-header">
               <h1>Researcher Datasets</h1>
               <p className="subtitle-small">Share your findings and manage your contributions</p>
             </header>
-
             <div className="settings-container-layout">
-
-              {/* SHARE NEW DATASET */}
               <div className="settings-card" style={{ marginBottom: "24px" }}>
                 <div className="card-title-row">
                   <div className="icon-box-light"><span className="pref-icon">📤</span></div>
-                  <div><h3>Share New Dataset</h3><p>Link your research files (Google Drive, GitHub, etc.)</p></div>
+                  <div><h3>Share New Dataset</h3><p>Link your research files</p></div>
                 </div>
                 <form onSubmit={handleShareDataset} style={{ padding: "20px" }}>
                   <div className="settings-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                     <div className="form-group">
                       <label>Dataset Title</label>
-                      <input type="text" placeholder="e.g. Soil Nutrient Analysis - North Region"
-                        value={newDatasetName} onChange={(e) => setNewDatasetName(e.target.value)}
-                        style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #eee" }} />
+                      <input type="text" placeholder="e.g. Soil Nutrient Analysis" value={newDatasetName} onChange={(e) => setNewDatasetName(e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #eee" }} />
                     </div>
                     <div className="form-group">
-                      <label>Source URL (Link)</label>
-                      <input type="url" placeholder="https://drive.google.com/..."
-                        value={newDatasetUrl} onChange={(e) => setNewDatasetUrl(e.target.value)}
-                        style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #eee" }} />
+                      <label>Source URL</label>
+                      <input type="url" placeholder="https://drive.google.com/..." value={newDatasetUrl} onChange={(e) => setNewDatasetUrl(e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #eee" }} />
                     </div>
                   </div>
                   <div style={{ marginTop: "20px", textAlign: "right" }}>
-                    <button type="submit" disabled={isUploading}
-                      style={{ padding: "12px 30px", background: "#7da07d", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>
+                    <button type="submit" disabled={isUploading} style={{ padding: "12px 30px", background: "#7da07d", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>
                       {isUploading ? "Uploading..." : "Share Dataset"}
                     </button>
                   </div>
                 </form>
               </div>
-
-              {/* SHARED DATASETS TABLE */}
               <div className="settings-card" style={{ padding: "0", overflow: "hidden" }}>
                 <div className="card-title-row" style={{ padding: "25px 30px", borderBottom: "1px solid #f0f0f0" }}>
                   <div className="icon-box-light"><span className="pref-icon">📊</span></div>
@@ -592,24 +457,18 @@ export default function ResearcherDashboard() {
                     </thead>
                     <tbody>
                       {researchData.length === 0 ? (
-                        <tr>
-                          <td colSpan="3" style={{ textAlign: "center", padding: "40px", color: "#888" }}>
-                            No datasets shared yet. Start by uploading one above! 🚀
-                          </td>
-                        </tr>
+                        <tr><td colSpan="3" style={{ textAlign: "center", padding: "40px", color: "#888" }}>No datasets shared yet 🚀</td></tr>
                       ) : (
                         researchData.map((item) => (
                           <tr key={item.id} style={{ borderBottom: "1px solid #f9f9f9", fontSize: "14px", color: "#333" }}>
                             <td style={{ padding: "15px 0", color: "#666" }}>{item.date || "Just now"}</td>
                             <td style={{ padding: "15px 0" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <FileText size={16} color="#7da07d" />
-                                <strong>{item.name}</strong>
+                                <FileText size={16} color="#7da07d" /><strong>{item.name}</strong>
                               </div>
                             </td>
                             <td style={{ padding: "15px 0", textAlign: "right" }}>
-                              <a href={item.url} target="_blank" rel="noopener noreferrer"
-                                style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#7da07d", fontWeight: "600", textDecoration: "none" }}>
+                              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#7da07d", fontWeight: "600", textDecoration: "none" }}>
                                 <Download size={14} /> View Link
                               </a>
                             </td>
@@ -624,34 +483,21 @@ export default function ResearcherDashboard() {
           </div>
         )}
 
-        {/* ─── WEATHER ─── */}
-        {activePage === "weather" && (
-          <div className="content-fade-in" key="weather"><Weather /></div>
-        )}
+        {activePage === "weather" && <div className="content-fade-in" key="weather"><Weather /></div>}
 
-        {/* ─── FIELD MAP ─── */}
         {activePage === "fieldMap" && (
           <div className="content-fade-in" key="fieldMap">
             <header className="page-header-flex">
               <div><h1>Field Map</h1><p>Soil Health Analysis & Field Management</p></div>
               <button className="add-field-btn" onClick={() => setShowModal(true)}>+ Add Field</button>
             </header>
-
             <div className="map-grid-layout">
               <div className="map-main-area">
                 <div className="coord-bar" style={{ justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: "10px" }}>
-                    <div className="input-box">
-                      <label>LATITUDE</label>
-                      <input type="text" placeholder="Enter latitude" value={inputLat} onChange={(e) => setInputLat(e.target.value)} />
-                    </div>
-                    <div className="input-box">
-                      <label>LONGITUDE</label>
-                      <input type="text" placeholder="Enter longitude" value={inputLng} onChange={(e) => setInputLng(e.target.value)} />
-                    </div>
-                    <button onClick={getCurrentLocation} style={{ height: "40px", marginTop: "20px", padding: "0 12px", background: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-                      📍 Use My Location
-                    </button>
+                    <div className="input-box"><label>LATITUDE</label><input type="text" placeholder="Enter latitude" value={inputLat} onChange={(e) => setInputLat(e.target.value)} /></div>
+                    <div className="input-box"><label>LONGITUDE</label><input type="text" placeholder="Enter longitude" value={inputLng} onChange={(e) => setInputLng(e.target.value)} /></div>
+                    <button onClick={getCurrentLocation} style={{ height: "40px", marginTop: "20px", padding: "0 12px", background: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>📍 Use My Location</button>
                   </div>
                   <div className="nutrient-select-box">
                     <label>Show Layer:</label>
@@ -663,20 +509,11 @@ export default function ResearcherDashboard() {
                     </select>
                   </div>
                 </div>
-
                 <div className="interactive-map-container" style={{ position: "relative" }}>
-                  <div style={{ position: "absolute", top: "20px", right: "20px", background: "#fff", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)", zIndex: 1000 }}>
-                    Click on map to select location 📍
-                  </div>
-
                   <MapContainer key={`${inputLat}-${inputLng}`} center={[parseFloat(inputLat) || 27.8083, parseFloat(inputLng) || 78.6458]} zoom={13} scrollWheelZoom={false} style={{ height: "100%", width: "100%", borderRadius: "20px" }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
                     <MapClickHandler />
-                    <Marker position={[parseFloat(inputLat), parseFloat(inputLng)]}>
-                      <Popup>📍 Selected Location</Popup>
-                    </Marker>
-
-                    {/* SOIL LAYERS */}
+                    <Marker position={[parseFloat(inputLat), parseFloat(inputLng)]}><Popup>📍 Selected Location</Popup></Marker>
                     {soilData.map((cell, idx) => {
                       const size = 0.003;
                       const key = nutrient === "N" ? "n" : nutrient === "P" ? "p" : nutrient === "K" ? "k" : "pH";
@@ -703,32 +540,21 @@ export default function ResearcherDashboard() {
                                 });
                                 const data = await res.json();
                                 setSoilPrediction(data.recommendations || []);
-                              } catch (err) {
-                                console.error("Prediction error:", err);
-                              } finally {
-                                setLoadingPrediction(false);
-                              }
+                              } catch (err) { console.error("Prediction error:", err); }
+                              finally { setLoadingPrediction(false); }
                             }
                           }}>
                           <Popup><strong>Soil Data</strong><br />{nutrient}: {val}</Popup>
                         </Rectangle>
                       );
                     })}
-
-                    {/* USER FIELDS */}
                     {fields.map((field) => (
-                      <Marker key={field.id} position={[field.lat, field.lng]}>
-                        <Popup><strong>{field.name}</strong><br />{field.crop}</Popup>
-                      </Marker>
+                      <Marker key={field.id} position={[field.lat, field.lng]}><Popup><strong>{field.name}</strong><br />{field.crop}</Popup></Marker>
                     ))}
                     {fields.map((field) => (
-                      <Rectangle key={"rect-" + field.id}
-                        bounds={[[field.lat - 0.002, field.lng - 0.002], [field.lat + 0.002, field.lng + 0.002]]}
-                        pathOptions={{ color: "#2563eb", fillOpacity: 0.1 }} />
+                      <Rectangle key={"rect-" + field.id} bounds={[[field.lat - 0.002, field.lng - 0.002], [field.lat + 0.002, field.lng + 0.002]]} pathOptions={{ color: "#2563eb", fillOpacity: 0.1 }} />
                     ))}
                   </MapContainer>
-
-                  {/* SOIL INSIGHT MODAL */}
                   {showSoilModal && selectedSoil && (
                     <div className="soil-modal-overlay">
                       <div className="soil-modal">
@@ -741,9 +567,7 @@ export default function ResearcherDashboard() {
                         </div>
                         <div className="prediction-box">
                           <h3>🌾 Top Crop Recommendations</h3>
-                          {loadingPrediction ? (
-                            <div className="loader"></div>
-                          ) : (
+                          {loadingPrediction ? <div className="loader"></div> : (
                             <div className="crop-list-modal">
                               {soilPrediction.slice(0, 3).map((crop, idx) => (
                                 <div key={idx} className="crop-item">🌱 {crop.crop}<span>{crop.confidence.toFixed(1)}%</span></div>
@@ -755,52 +579,32 @@ export default function ResearcherDashboard() {
                       </div>
                     </div>
                   )}
-
-                  {/* LEGEND */}
                   <div className="map-legend-overlay">
                     <h4>{nutrient} Levels</h4>
                     {nutrient === "pH" ? (
-                      <>
-                        <div className="legend-item"><span style={{ background: "#60a5fa" }}></span> Acidic</div>
-                        <div className="legend-item"><span style={{ background: "#22c55e" }}></span> Neutral</div>
-                        <div className="legend-item"><span style={{ background: "#f97316" }}></span> Alkaline</div>
-                      </>
+                      <><div className="legend-item"><span style={{ background: "#60a5fa" }}></span> Acidic</div><div className="legend-item"><span style={{ background: "#22c55e" }}></span> Neutral</div><div className="legend-item"><span style={{ background: "#f97316" }}></span> Alkaline</div></>
                     ) : (
-                      <>
-                        <div className="legend-item"><span style={{ background: "#ef4444" }}></span> Low</div>
-                        <div className="legend-item"><span style={{ background: "#facc15" }}></span> Medium</div>
-                        <div className="legend-item"><span style={{ background: "#22c55e" }}></span> High</div>
-                      </>
+                      <><div className="legend-item"><span style={{ background: "#ef4444" }}></span> Low</div><div className="legend-item"><span style={{ background: "#facc15" }}></span> Medium</div><div className="legend-item"><span style={{ background: "#22c55e" }}></span> High</div></>
                     )}
                   </div>
                 </div>
               </div>
-
-              {/* FIELDS SIDEBAR */}
               <div className="fields-sidebar">
                 <div className="field-list-header"><span>📂</span><h3>Your Fields</h3></div>
                 <div className="field-cards-container">
                   {fields.map((field) => (
                     <div key={field.id} className="field-item" onClick={() => { setInputLat(field.lat); setInputLng(field.lng); }} style={{ cursor: "pointer" }}>
                       <div className={`field-status ${field.color}`}></div>
-                      <div className="field-info">
-                        <strong>{field.name}</strong>
-                        <p>{field.crop} • {field.area} ha</p>
-                      </div>
+                      <div className="field-info"><strong>{field.name}</strong><p>{field.crop} • {field.area} ha</p></div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-
-            {/* ADD FIELD MODAL */}
             {showModal && (
               <div className="modal-overlay">
                 <div className="modal-content">
-                  <div className="modal-header">
-                    <h3>Add New Field</h3>
-                    <button className="close-btn" onClick={() => setShowModal(false)}><X size={20} /></button>
-                  </div>
+                  <div className="modal-header"><h3>Add New Field</h3><button className="close-btn" onClick={() => setShowModal(false)}><X size={20} /></button></div>
                   <div className="modal-body">
                     <label>Field Name</label>
                     <input type="text" value={newField.name} onChange={(e) => setNewField({ ...newField, name: e.target.value })} />
@@ -813,22 +617,16 @@ export default function ResearcherDashboard() {
                       <div><label>Lng</label><input type="text" value={newField.lng} onChange={(e) => setNewField({ ...newField, lng: e.target.value })} /></div>
                     </div>
                   </div>
-                  <div className="modal-footer">
-                    <button className="save-btn" onClick={handleAddField}>Save Field</button>
-                  </div>
+                  <div className="modal-footer"><button className="save-btn" onClick={handleAddField}>Save Field</button></div>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* ─── CROP SUGGESTIONS ─── */}
         {activePage === "cropSuggestions" && <CropSuggestionUI />}
-
-        {/* ─── SOIL HEALTH ─── */}
         {activePage === "soilHealth" && <SoilHealthUI />}
 
-        {/* ─── SETTINGS ─── */}
         {activePage === "settings" && (
           <div className="content-fade-in" key="settings">
             <header className="page-header"><h1>Settings</h1><p className="subtitle-small">Manage account preferences</p></header>
@@ -857,7 +655,6 @@ export default function ResearcherDashboard() {
             </div>
           </div>
         )}
-
       </main>
     </div>
   );
