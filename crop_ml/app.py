@@ -19,7 +19,7 @@ city_cache = {}
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=["https://dhurandar-aeoa.vercel.app"])
+CORS(app, origins=["agrismart-aeoa.vercel.app"])
 
 conn = None  # FIX: initialize as None so we can check later
 try:
