@@ -32,7 +32,7 @@ export default function UserDashboard() {
   const [user, setUser] = useState({ name: "", email: "", role: "" });
 
   useEffect(() => {
-    fetch("${process.env.REACT_APP_DJANGO_URL}/api/users/researchers/")
+    fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/researchers/`)
       .then(res => res.json())
       .then(data => setResearchData(data))
       .catch(err => console.error("Research fetch error:", err));
@@ -93,7 +93,7 @@ export default function UserDashboard() {
     setIsSaving(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("${process.env.REACT_APP_DJANGO_URL}/api/users/update_user/", {
+      const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/update_user/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
         body: JSON.stringify({ full_name: settings.name, email: settings.email })
@@ -173,7 +173,7 @@ export default function UserDashboard() {
 
   const fetchFields = async () => {
     const token = localStorage.getItem("token");
-    const res = await fetch("${process.env.REACT_APP_DJANGO_URL}/api/users/fields/", {
+    const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/fields/`, {
       headers: { Authorization: `Token ${token}` }
     });
     const data = await res.json();
@@ -194,7 +194,7 @@ export default function UserDashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    fetch("${process.env.REACT_APP_DJANGO_URL}/api/users/profile/", {
+    fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/profile/`, {
       headers: { Authorization: `Token ${token}` }
     })
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
@@ -217,7 +217,7 @@ export default function UserDashboard() {
     const token = localStorage.getItem("token");
     if (!newField.name || !newField.lat || !newField.lng) return alert("Please fill all details");
     try {
-      await fetch("${process.env.REACT_APP_DJANGO_URL}/api/users/add-field/", {
+      await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/add-field/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Token ${token}` },
         body: JSON.stringify({
@@ -234,7 +234,7 @@ export default function UserDashboard() {
   const handleLogout = async () => {
     if (!window.confirm("Are you sure you want to logout?")) return;
     try {
-      const res = await fetch("${process.env.REACT_APP_DJANGO_URL}/api/users/logout/", {
+      const res = await fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/logout/`, {
         method: "POST", credentials: "include"
       });
       if (res.ok) {

@@ -161,7 +161,7 @@ const deleteResearcher = (id) => {
 useEffect(() => {
   const token = localStorage.getItem("token");
 
-  fetch("${process.env.REACT_APP_DJANGO_URL}/api/users/profile/", {
+  fetch(`${process.env.REACT_APP_DJANGO_URL}/api/users/profile/`, {
     headers: {
       Authorization: `Token ${token}`
     }
