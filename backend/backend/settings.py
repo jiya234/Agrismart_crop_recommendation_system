@@ -22,7 +22,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'apikey'
 EMAIL_HOST_PASSWORD = config('SENDGRID_API_KEY')
-
+SENDGRID_API_KEY = config('SENDGRID_API_KEY')
 INSTALLED_APPS = [
     'users',
     'accounts',
