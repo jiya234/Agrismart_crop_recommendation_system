@@ -19,7 +19,7 @@ const ResetPassword = () => {
     setLoading(true);
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/api/users/reset-password/${uidb64}/${token}/`,
+        `${process.env.REACT_APP_DJANGO_URL}/api/users/reset-password/${uidb64}/${token}/`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
