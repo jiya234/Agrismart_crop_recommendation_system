@@ -63,7 +63,7 @@ function SoilHealthUI() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("${process.env.REACT_APP_ML_URL}/soil-health", {
+      const res = await fetch("${process.env.REACT_APP_FLASK_URL}/soil-health", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

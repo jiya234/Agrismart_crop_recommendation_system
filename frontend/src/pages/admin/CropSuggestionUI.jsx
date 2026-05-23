@@ -23,7 +23,7 @@ function CropSuggestionUI() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${process.env.REACT_APP_ML_URL}/predict`, {
+      const res = await fetch(`${process.env.REACT_APP_FLASK_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

@@ -116,7 +116,7 @@ export default function ResearcherDashboard() {
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!inputLat || !inputLng) return;
-      fetch(`${process.env.REACT_APP_ML_URL}/weather?lat=${inputLat}&lon=${inputLng}`)
+      fetch(`${process.env.REACT_APP_FLASK_URL}/weather?lat=${inputLat}&lon=${inputLng}`)
         .then(res => res.json())
         .then(data => setDashboardWeather({
           temp: data.temperature,
@@ -198,7 +198,7 @@ export default function ResearcherDashboard() {
         latitude: parseFloat(inputLat),
         longitude: parseFloat(inputLng)
       };
-      const res = await fetch("${process.env.REACT_APP_ML_URL}/predict", {
+      const res = await fetch("${process.env.REACT_APP_FLASK_URL}/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -281,7 +281,7 @@ export default function ResearcherDashboard() {
   const handleSearchLocation = async () => {
     if (!place.trim()) { alert("Please enter a location"); return; }
     try {
-      const res = await fetch(`${process.env.REACT_APP_ML_URL}/geocode?place=${place}`);
+      const res = await fetch(`${process.env.REACT_APP_FLASK_URL}/geocode?place=${place}`);
       const data = await res.json();
       if (data.error) { alert(data.error); return; }
       setInputLat(data.lat);
@@ -694,9 +694,9 @@ export default function ResearcherDashboard() {
                               setShowSoilModal(true);
                               try {
                                 setLoadingPrediction(true);
-                                const weatherRes = await fetch(`${process.env.REACT_APP_ML_URL}/weather?lat=${clickedData.lat}&lon=${clickedData.lng}`);
+                                const weatherRes = await fetch(`${process.env.REACT_APP_FLASK_URL}/weather?lat=${clickedData.lat}&lon=${clickedData.lng}`);
                                 const weatherData = await weatherRes.json();
-                                const res = await fetch("${process.env.REACT_APP_ML_URL}/predict", {
+                                const res = await fetch("${process.env.REACT_APP_FLASK_URL}/predict", {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ Nitrogen: clickedData.N, Phosphorus: clickedData.P, Potassium: clickedData.K, Ph: clickedData.ph, temperature: weatherData.temperature, humidity: weatherData.humidity, rainfall: weatherData.rainfall })
