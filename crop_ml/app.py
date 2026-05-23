@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import pandas as pd
 import joblib
 from flask_cors import CORS
-import psycopg
+import psycopg2  # FIX: was 'psycopg' (psycopg3), should be 'psycopg2'
 import urllib3
 import time
 
@@ -21,12 +21,13 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app, origins=["https://dhurandar-aeoa.vercel.app"])
 
+conn = None  # FIX: initialize as None so we can check later
 try:
-    conn = psycopg.connect(os.getenv("DATABASE_URL"))
+    conn = psycopg2.connect(os.getenv("DATABASE_URL"))
     conn.autocommit = True
     print("✅ Connected")
 except Exception as e:
-    print("❌ Error:", e)
+    print("❌ DB Connection Error:", e)
 
 # ---------------------------------
 # LOAD MODELS
@@ -144,6 +145,9 @@ def get_city_cached(lat, lon):
 
 # ---------------------------------
 # FEATURE BUILDER
+# FIX: must match EXACTLY the 15 features the season_model was trained on
+# Order: N, P, K, temp, humidity, ph, rainfall, npk_total, soil_fertility,
+#        n_p_ratio, n_k_ratio, p_k_ratio, water_index, gdd_approx, season_rabi
 # ---------------------------------
 def build_features(N, P, K, ph, rainfall, temp, humidity):
     npk_total = N + P + K
@@ -195,6 +199,24 @@ def soil_suggestions(category):
 
 
 # ---------------------------------
+# DB RECONNECT HELPER
+# FIX: psycopg2 connections can go stale; reconnect if needed
+# ---------------------------------
+def get_cursor():
+    global conn
+    try:
+        # Test if connection is alive
+        conn.cursor().execute("SELECT 1")
+    except Exception:
+        try:
+            conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+            conn.autocommit = True
+        except Exception as e:
+            raise RuntimeError(f"DB reconnect failed: {e}")
+    return conn.cursor()
+
+
+# ---------------------------------
 # CROP API
 # ---------------------------------
 @app.route('/predict', methods=['POST'])
@@ -220,7 +242,8 @@ def predict_api():
             LIMIT 1;
             """
 
-            with conn.cursor() as cursor:
+            # FIX: use get_cursor() instead of conn.cursor() directly
+            with get_cursor() as cursor:
                 cursor.execute(query, (lat, lon))
                 result = cursor.fetchone()
 
@@ -290,8 +313,8 @@ def predict_api():
         })
 
     except Exception as e:
-        conn.rollback()
-        print("ERROR:", e)
+        # FIX: removed conn.rollback() — autocommit=True means no transaction to roll back
+        print("ERROR in /predict:", e)
         return jsonify({"error": str(e)})
 
 
@@ -315,6 +338,18 @@ def soil_health_api():
         Mn = float(data["Mn"])
         Cu = float(data["Cu"])
 
+        # FIX: soil_model expects SCALED input — apply scaler before predict
+        # Column order must match what scaler was fit on: N,P,K,EC,OC,ph/pH,S,Fe,Zn,Mn,Cu
+        soil_sample_raw = pd.DataFrame({
+            "N": [N], "P": [P], "K": [K],
+            "EC": [EC], "OC": [OC], "ph": [pH],
+            "S": [S], "Fe": [Fe], "Zn": [Zn],
+            "Mn": [Mn], "Cu": [Cu]
+        })
+
+        soil_sample_scaled = scaler.transform(soil_sample_raw)
+
+        # Nutrient model uses RAW values (it was fit on raw data)
         nutrient_sample = pd.DataFrame({
             "N": [N], "P": [P], "K": [K],
             "S": [S], "Fe": [Fe], "Zn": [Zn],
@@ -322,14 +357,7 @@ def soil_health_api():
             "OC": [OC], "EC": [EC], "pH": [pH]
         })
 
-        soil_sample = pd.DataFrame({
-            "N": [N], "P": [P], "K": [K],
-            "EC": [EC], "OC": [OC], "pH": [pH],
-            "S": [S], "Fe": [Fe], "Zn": [Zn],
-            "Mn": [Mn], "Cu": [Cu]
-        })
-
-        predicted_shi = float(soil_model.predict(soil_sample)[0])
+        predicted_shi = float(soil_model.predict(soil_sample_scaled)[0])
         category = soil_category(predicted_shi)
         suggestions = soil_suggestions(category)
 
@@ -352,6 +380,7 @@ def soil_health_api():
         })
 
     except Exception as e:
+        print("ERROR in /soil-health:", e)
         return jsonify({"error": str(e)})
 
 
