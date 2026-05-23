@@ -14,14 +14,17 @@ def send_otp(request):
     OTP.objects.filter(email=email).delete()
     otp = str(random.randint(100000, 999999))
     OTP.objects.create(email=email, otp=otp)
-    send_mail(
-        'AgriSmart OTP',
-        f'Your OTP is {otp}',
-        settings.EMAIL_HOST_USER,
-        [email],
-        fail_silently=False,
-    )
-    return Response({"message": "OTP sent"})
+    try:
+        send_mail(
+            'AgriSmart OTP',
+            f'Your OTP is {otp}',
+            settings.EMAIL_HOST_USER,
+            [email],
+            fail_silently=False,
+        )
+        return Response({"message": "OTP sent"})
+    except Exception as e:
+        return Response({"error": f"Email failed: {str(e)}"}, status=500)
 
 
 @api_view(['POST'])
