@@ -66,7 +66,7 @@ export default function UserDashboard() {
         };
       }
 
-      const res = await fetch("${process.env.REACT_APP_FLASK_URL}/predict", {
+      const res = await fetch(`${process.env.REACT_APP_FLASK_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -551,7 +551,7 @@ export default function UserDashboard() {
                                 setLoadingPrediction(true);
                                 const wRes = await fetch(`${process.env.REACT_APP_FLASK_URL}/weather?lat=${cd.lat}&lon=${cd.lng}`);
                                 const w = await wRes.json();
-                                const pRes = await fetch("${process.env.REACT_APP_FLASK_URL}/predict", {
+                                const pRes = await fetch(`${process.env.REACT_APP_FLASK_URL}/predict`, {
                                   method: "POST",
                                   headers: {
                                     "Content-Type": "application/json"

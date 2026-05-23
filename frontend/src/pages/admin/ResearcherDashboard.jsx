@@ -198,7 +198,7 @@ export default function ResearcherDashboard() {
         latitude: parseFloat(inputLat),
         longitude: parseFloat(inputLng)
       };
-      const res = await fetch("${process.env.REACT_APP_FLASK_URL}/predict", {
+      const res = await fetch(`${process.env.REACT_APP_FLASK_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -696,7 +696,7 @@ export default function ResearcherDashboard() {
                                 setLoadingPrediction(true);
                                 const weatherRes = await fetch(`${process.env.REACT_APP_FLASK_URL}/weather?lat=${clickedData.lat}&lon=${clickedData.lng}`);
                                 const weatherData = await weatherRes.json();
-                                const res = await fetch("${process.env.REACT_APP_FLASK_URL}/predict", {
+                                const res = await fetch(`${process.env.REACT_APP_FLASK_URL}/predict`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ Nitrogen: clickedData.N, Phosphorus: clickedData.P, Potassium: clickedData.K, Ph: clickedData.ph, temperature: weatherData.temperature, humidity: weatherData.humidity, rainfall: weatherData.rainfall })
