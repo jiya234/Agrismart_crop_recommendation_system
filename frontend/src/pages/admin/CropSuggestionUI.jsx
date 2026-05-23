@@ -31,7 +31,7 @@ function CropSuggestionUI() {
       const data = await res.json();
       setResult(data);
     } catch (err) {
-      setError("Could not connect to server. Make sure Flask is running.");
+      setError("Could not connect to server.");
     } finally {
       setLoading(false);
     }
