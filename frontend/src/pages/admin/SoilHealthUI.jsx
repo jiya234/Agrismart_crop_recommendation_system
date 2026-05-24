@@ -99,7 +99,7 @@ function SoilHealthUI() {
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE}/api/users/soil-health/`, {
+      const res = await fetch(`${API_BASE}/soil-health`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
