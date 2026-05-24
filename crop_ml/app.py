@@ -336,8 +336,6 @@ def soil_health_api():
         Mn = float(data["Mn"])
         Cu = float(data["Cu"])
 
-        # FIX: soil_model expects SCALED input — apply scaler before predict
-        # Column order must match what scaler was fit on: N,P,K,EC,OC,ph/pH,S,Fe,Zn,Mn,Cu
         soil_sample_raw = pd.DataFrame({
             "N": [N], "P": [P], "K": [K],
             "EC": [EC], "OC": [OC], "ph": [pH],
@@ -347,13 +345,12 @@ def soil_health_api():
 
         soil_sample_scaled = scaler.transform(soil_sample_raw)
 
-        # Nutrient model uses RAW values (it was fit on raw data)
         nutrient_sample = pd.DataFrame({
-    "N": [N], "P": [P], "K": [K],
-    "S": [S], "Fe": [Fe], "Zn": [Zn],
-    "Mn": [Mn], "Cu": [Cu],
-    "OC": [OC], "EC": [EC], "ph": [pH]
-})
+            "N": [N], "P": [P], "K": [K],
+            "S": [S], "Fe": [Fe], "Zn": [Zn],
+            "Mn": [Mn], "Cu": [Cu],
+            "OC": [OC], "EC": [EC], "pH": [pH]
+        })
 
         predicted_shi = float(soil_model.predict(soil_sample_scaled)[0])
         category = soil_category(predicted_shi)
@@ -380,8 +377,6 @@ def soil_health_api():
     except Exception as e:
         print("ERROR in /soil-health:", e)
         return jsonify({"error": str(e)})
-
-
 # ---------------------------------
 # WEATHER API
 # ---------------------------------
