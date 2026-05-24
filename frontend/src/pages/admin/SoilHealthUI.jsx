@@ -93,16 +93,19 @@ function SoilHealthUI() {
     return { deficiencies, suggestions };
   };
 
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
+      const payload = { ...formData, ph: formData.pH };
+      delete payload.pH;
+
       const res = await fetch(`${API_BASE}/soil-health`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       let data = {};
@@ -112,10 +115,7 @@ function SoilHealthUI() {
         console.error("Invalid JSON:", err);
       }
 
-      // ── FIXED: handle both "shi" and "soil_health" from backend ──
       const score = data.shi ?? data.soil_health ?? 0;
-
-      // use backend values if present, otherwise compute on frontend
       const { deficiencies, suggestions } = buildDeficienciesAndSuggestions(formData);
 
       setResult({
