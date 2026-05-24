@@ -4,6 +4,8 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./SoilHealthUI.css";
 
+const API_BASE = process.env.REACT_APP_API_URL;
+
 function SoilHealthUI() {
   const [formData, setFormData] = useState({
     N: "", P: "", K: "", pH: "",
@@ -58,20 +60,73 @@ function SoilHealthUI() {
     setFormData({ ...formData, [name]: value });
   };
 
+  // ── FIXED: result logic merged from Doc 1 ──
+  const getCategory = (score) => {
+    if (score > 70) return "Good";
+    if (score > 40) return "Moderate";
+    return "Poor";
+  };
+
+  const buildDeficienciesAndSuggestions = (fd) => {
+    const deficiencies = [];
+    const suggestions = [];
+
+    if (parseFloat(fd.N) < 50) {
+      deficiencies.push("Nitrogen Low");
+      suggestions.push("Add urea or compost for Nitrogen");
+    }
+    if (parseFloat(fd.P) < 30) {
+      deficiencies.push("Phosphorus Low");
+      suggestions.push("Use DAP fertilizer");
+    }
+    if (parseFloat(fd.K) < 30) {
+      deficiencies.push("Potassium Low");
+      suggestions.push("Add potash fertilizer");
+    }
+    if (parseFloat(fd.pH) < 6.5) {
+      suggestions.push("Add lime to reduce acidity");
+    }
+    if (parseFloat(fd.pH) > 7.5) {
+      suggestions.push("Use gypsum to reduce alkalinity");
+    }
+
+    return { deficiencies, suggestions };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
     try {
-      const res = await fetch(`${process.env.REACT_APP_FLASK_URL}/soil-health`, {
+      const res = await fetch(`${API_BASE}/api/users/soil-health/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      const data = await res.json();
-      setResult(data);
+
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (err) {
+        console.error("Invalid JSON:", err);
+      }
+
+      // ── FIXED: handle both "shi" and "soil_health" from backend ──
+      const score = data.shi ?? data.soil_health ?? 0;
+
+      // use backend values if present, otherwise compute on frontend
+      const { deficiencies, suggestions } = buildDeficienciesAndSuggestions(formData);
+
+      setResult({
+        shi: score,
+        category: data.category || getCategory(score),
+        deficiencies: data.deficiencies?.length ? data.deficiencies : deficiencies,
+        suggestions: data.suggestions?.length ? data.suggestions : suggestions,
+      });
+
     } catch (err) {
-      setError("Could not connect to server. Make sure Flask is running.");
+      setError("Could not connect to server. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -84,9 +139,9 @@ function SoilHealthUI() {
   }));
 
   const getCategoryStyle = (cat) => {
-    if (cat === "Good") return { bg: "#f0fdf4", border: "#10b981", text: "#065f46", icon: "🌱", sub: "Soil is healthy and productive" };
+    if (cat === "Good")     return { bg: "#f0fdf4", border: "#10b981", text: "#065f46", icon: "🌱", sub: "Soil is healthy and productive" };
     if (cat === "Moderate") return { bg: "#fffbeb", border: "#f59e0b", text: "#78350f", icon: "⚠️", sub: "Needs some improvement" };
-    return { bg: "#fef2f2", border: "#ef4444", text: "#7f1d1d", icon: "❌", sub: "Poor condition, needs attention" };
+    return                         { bg: "#fef2f2", border: "#ef4444", text: "#7f1d1d", icon: "❌", sub: "Poor condition, needs attention" };
   };
 
   return (
@@ -110,17 +165,17 @@ function SoilHealthUI() {
         <form onSubmit={handleSubmit}>
           <div className="sh-form-grid">
             {[
-              { name: "N",  label: "Nitrogen",        unit: "kg/ha" },
-              { name: "P",  label: "Phosphorus",       unit: "kg/ha" },
-              { name: "K",  label: "Potassium",        unit: "kg/ha" },
-              { name: "pH", label: "pH",               unit: "0–14",  step: "0.1" },
-              { name: "EC", label: "EC",               unit: "dS/m",  step: "0.01" },
-              { name: "OC", label: "Organic Carbon",   unit: "%",     step: "0.01" },
-              { name: "S",  label: "Sulphur",          unit: "ppm",   step: "0.1" },
-              { name: "Fe", label: "Iron",             unit: "ppm",   step: "0.01" },
-              { name: "Zn", label: "Zinc",             unit: "ppm",   step: "0.01" },
-              { name: "Mn", label: "Manganese",        unit: "ppm",   step: "0.01" },
-              { name: "Cu", label: "Copper",           unit: "ppm",   step: "0.01" },
+              { name: "N",  label: "Nitrogen",       unit: "kg/ha" },
+              { name: "P",  label: "Phosphorus",      unit: "kg/ha" },
+              { name: "K",  label: "Potassium",       unit: "kg/ha" },
+              { name: "pH", label: "pH",              unit: "0–14",  step: "0.1" },
+              { name: "EC", label: "EC",              unit: "dS/m",  step: "0.01" },
+              { name: "OC", label: "Organic Carbon",  unit: "%",     step: "0.01" },
+              { name: "S",  label: "Sulphur",         unit: "ppm",   step: "0.1" },
+              { name: "Fe", label: "Iron",            unit: "ppm",   step: "0.01" },
+              { name: "Zn", label: "Zinc",            unit: "ppm",   step: "0.01" },
+              { name: "Mn", label: "Manganese",       unit: "ppm",   step: "0.01" },
+              { name: "Cu", label: "Copper",          unit: "ppm",   step: "0.01" },
             ].map(({ name, label, unit, step }) => (
               <div className="form-group" key={name}>
                 <label>{label} <span className="unit">{unit}</span></label>
@@ -168,8 +223,8 @@ function SoilHealthUI() {
                       bgcolor: "white",
                       borderwidth: 0,
                       steps: [
-                        { range: [0, 40],  color: "#fee2e2" },
-                        { range: [40, 70], color: "#fef9c3" },
+                        { range: [0, 40],   color: "#fee2e2" },
+                        { range: [40, 70],  color: "#fef9c3" },
                         { range: [70, 100], color: "#dcfce7" },
                       ],
                     },
