@@ -4,7 +4,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./SoilHealthUI.css";
 
-const API_BASE = process.env.REACT_APP_API_URL;
+const API_BASE = process.env.REACT_APP_DJANGO_URL;
 
 function SoilHealthUI() {
   const [formData, setFormData] = useState({
