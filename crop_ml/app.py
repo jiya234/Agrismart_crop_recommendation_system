@@ -327,7 +327,7 @@ def soil_health_api():
         N = float(data["N"])
         P = float(data["P"])
         K = float(data["K"])
-        pH = float(data["pH"])
+        pH = float(data.get("pH") or data.get("ph"))
         EC = float(data["EC"])
         OC = float(data["OC"])
         S = float(data["S"])
