@@ -349,11 +349,11 @@ def soil_health_api():
 
         # Nutrient model uses RAW values (it was fit on raw data)
         nutrient_sample = pd.DataFrame({
-            "N": [N], "P": [P], "K": [K],
-            "S": [S], "Fe": [Fe], "Zn": [Zn],
-            "Mn": [Mn], "Cu": [Cu],
-            "OC": [OC], "EC": [EC], "pH": [pH]
-        })
+    "N": [N], "P": [P], "K": [K],
+    "S": [S], "Fe": [Fe], "Zn": [Zn],
+    "Mn": [Mn], "Cu": [Cu],
+    "OC": [OC], "EC": [EC], "ph": [pH]
+})
 
         predicted_shi = float(soil_model.predict(soil_sample_scaled)[0])
         category = soil_category(predicted_shi)
